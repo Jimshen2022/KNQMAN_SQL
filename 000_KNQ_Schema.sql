@@ -1,0 +1,57 @@
+SELECT  *  FROM INFORMATION_SCHEMA.COLUMNS
+
+select top 10 * FROM ECUS5_KNQ.dbo.DCONTAINER
+
+
+SELECT TRANG_THAI, COUNT(*) AS Total_Rows
+FROM DPHIEU WITH(NOLOCK)
+WHERE _XORN = 'N' AND HUY_LY_DO IS NULL AND MA_KNQ = 'VNNSL'
+GROUP BY TRANG_THAI;
+
+
+SELECT DISTINCT MA_KNQ, COUNT(*) AS so_phieu
+FROM ECUS5_KNQ.dbo.DPHIEU
+WHERE _XORN = 'N'
+GROUP BY MA_KNQ
+ORDER BY so_phieu DESC;
+
+
+SELECT MA_KNQ, TEN_KNQ, DIA_CHI 
+FROM ECUS5_KNQ.dbo.SKNQ;
+
+
+
+SELECT 
+    MA_SP AS N'Mã hàng',
+    SO_LUONG_TON AS N'SL Tồn',
+    TRI_GIA_TON AS N'Trị Giá Tồn'
+FROM 
+    ECUS5_KNQ.dbo.DBC_HOAT_DONG_HANG_TON
+WHERE 
+    SO_LUONG_TON > 0;
+
+
+    SELECT 
+    P.SOTK AS N'Số TK nhập',
+    P.NGAY_DK AS N'Ngày TK',
+    P.SO_PHIEU AS N'Số PNK',
+    P.NGAY_PHIEU AS N'Ngày NK',
+    H.MA_SP AS N'Mã hàng',
+    H.TEN_SP AS N'Tên hàng',
+    H.SO_LUONG AS N'Lượng', -- 原始入库量
+    -- 在某些 ECUS 配置中，SO_LUONG 在库存视图里会动态变更为“剩余量”
+    -- 或者通过 (SO_LUONG - SO_LUONG_THUC_TE) 计算
+    H.MA_DVT AS N'Đơn vị tính'
+FROM 
+    ECUS5_KNQ.dbo.DPHIEU P
+INNER JOIN 
+    ECUS5_KNQ.dbo.DPHIEU_HANG H ON P.DPHIEUID = H.DPHIEUID
+WHERE 
+    P._XORN = 'N'              -- 入库单
+    AND P.MA_KNQ = 'VNNSL'     -- 你的仓库
+    AND P.MESSAGEID IS NOT NULL -- 必须是正式报关的
+    AND ISNULL(H.IS_XUAT, 0) = 0 -- 【核心过滤】系统标记为“未出库”或“未结案”的行
+    AND ISNULL(H.IS_HUY, 0) = 0;
+
+
+    SELECT COUNT(*) FROM DBC_HOAT_DONG_HANG_TON
