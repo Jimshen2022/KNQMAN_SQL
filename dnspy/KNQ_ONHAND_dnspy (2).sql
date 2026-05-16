@@ -1,6 +1,6 @@
 -- ====================================================================
 -- 【终极完整纯查询版】ECUS5 保税仓 FIFO 实时结存与库龄总账 (OnHand)
---  无权限门槛，全选直接运行！字段顺序已 100% 对齐原版系统
+-- （无权限门槛，列名与系统原生字段 100% 一致，附带详尽中文业务注释）
 -- ====================================================================
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
@@ -8,9 +8,8 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 -- ========================================
 -- 🔻 请在这里修改你的查询参数 🔻
 -- ========================================
-DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';   -- ★ 必须修改：例如 'VNNSL'
+DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';          -- ★ 必须修改：例如 'VNNSL'
 DECLARE @TargetDate DATETIME = GETDATE();       -- 默认盘点截止到今天此刻，也可改为特定日期如 '2026-05-17'
-
 
 -- --------------------------------------------------------------------
 -- STEP 1: 提取所有【集装箱重箱（Type = 1）】的原始入库基础账
@@ -193,21 +192,50 @@ BEGIN
 END;
 
 -- --------------------------------------------------------------------
--- STEP 8: 【斩杀与最终输出】还原原始代码的列排序与逻辑
+-- STEP 8: 【斩杀与最终输出】对齐系统原始英文字段与 Excel 排序
 -- --------------------------------------------------------------------
 UPDATE #NHAP2 SET TRI_GIA_TON = ISNULL(LUONG_TON * GIA_NHAP * TY_GIA_VND, 0);
 UPDATE #NHAP2 SET GHI_CHU = CASE WHEN A.GHI_CHU = '' THEN '' ELSE A.GHI_CHU + ', ' END + N'Có hàng tiêu hủy' FROM #NHAP2 A, #XUAT2 B WHERE A.CKEYS = B.CKEYS AND B.IS_TIEU_HUY = 1;
 
--- 【绝杀】：扣减完没余额的货，直接人间蒸发！只留纯正的 OnHand！
+-- 【绝杀清零】：扣减完没余额的货，直接物理删除！只留纯正的 OnHand 实存！
 DELETE #NHAP2 WHERE ROUND(LUONG_TON, 4) <= 0;
 
--- 精确库龄计算
+-- 动态计算精准库龄
 UPDATE #NHAP2 SET SO_NGAY_TON = DATEDIFF(dd, NGAY_NHAP, @TargetDate) + 1;
 
 -- ====================================================================
--- 终极输出：完全对齐 C# 源码里的那句最终查询！
+-- 终极输出：抛弃中文别名，完美对齐 ECUS5 数据库原生列名，并附加详尽业务注释
 -- ====================================================================
-SELECT *, SO_LUONG AS LUONG_NHAP 
+SELECT 
+    SO_PHIEU,             -- [入库单] 初始入库单号 (Số phiếu)
+    NGAY_PHIEU,           -- [入库单] 初始入仓日期 (Ngày phiếu)
+    SO_HD,                -- [合规] 保税合同号 (Số hợp đồng)
+    NGAY_HD,              -- [合规] 保税合同录入日期 (Ngày hợp đồng)
+    MA_NGUON,             -- [来源] 货物来源属性代码 (Mã nguồn)
+    SO_TK,                -- [报关] 海关进口报关单号 (Số tờ khai)
+    NGAY_DK,              -- [报关] 报关单申报注册日期 (Ngày đăng ký)
+    NGAY_NHAP,            -- [溯源] 原始真实入库日期 (Ngày nhập)
+    DINH_DANH_HANG_HOA,   -- [溯源] 货物海关唯一定标码 (Định danh hàng hóa)
+    MA_SP,                -- [商品] 内部商品编码 (Mã sản phẩm)
+    TEN_SP,               -- [商品] 商品综合品名 (Tên sản phẩm)
+    MA_NUOC,              -- [商品] 原产国代码 (Mã nước)
+    MA_HS,                -- [报关] 海关HS税号 (Mã HS)
+    SO_LUONG AS LUONG_NHAP, -- [物控] 原始到货总量 (Lượng nhập)
+    LUONG_XUAT,           -- [物控] 已被领走/出库数量 (Lượng xuất)
+    LUONG_TON,            -- [物控] ★ 当前在库实物结存数量 (Lượng tồn)
+    MA_DVT,               -- [物控] 计量单位编码 (Mã ĐVT)
+    TRONG_LUONG_GW,       -- [物控] 毛重-Gross Weight (Trọng lượng GW)
+    TRONG_LUONG_NW,       -- [物控] 净重-Net Weight (Trọng lượng NW)
+    GIA_NHAP,             -- [财务] 原始进口单价 (Đơn giá nhập)
+    TRI_GIA_TON,          -- [财务] ★ 当前结存总资产价值 (Trị giá tồn)
+    VI_TRI_HANG,          -- [仓配] 仓库物理货位格 (Vị trí hàng)
+    SO_CONT,              -- [仓配] 集装箱柜号 (Số Container)
+    SO_SEAL,              -- [仓配] 海关铅封号 (Số Seal)
+    TEN_NGUON,            -- [字典] 货物来源类型说明 (Tên nguồn)
+    TEN_DVT,              -- [字典] 计量单位名称说明 (Tên ĐVT)
+    TEN_KH,               -- [客户] 货主客户名称 (Tên khách hàng)
+    SO_NGAY_TON,          -- [库龄] ★ 该批货物实际滞库天数 (Số ngày tồn)
+    GHI_CHU               -- [其他] 系统级动作备注 (Ghi chú)
 FROM #NHAP2 
 ORDER BY NGAY_PHIEU ASC, SO_PHIEU ASC, STTHANG ASC;
 
