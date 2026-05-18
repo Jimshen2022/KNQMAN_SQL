@@ -4,8 +4,8 @@
 SET NOCOUNT ON;
 
 DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';   -- 例如 'VNNSL'
-DECLARE @StartDate DATETIME = '2026-04-01';     --【变量：入库开始日期】
-DECLARE @EndDate DATETIME = '2026-05-17';       --【变量：入库结束日期】
+DECLARE @StartDate DATETIME = '2026-04-19';     --【变量：入库开始日期】
+DECLARE @EndDate DATETIME = '2026-05-12';       --【变量：入库结束日期】
 
 -- --------------------------------------------------------------------
 -- STEP 1: 提取所有【集装箱重箱（Type = 1）】的正式生效入库流水
