@@ -1,12 +1,14 @@
 -- ====================================================================
 -- 完美克隆：ECUS5 保税仓货物入库明细流水账（KNQ_4W_IMPORTED）
--- （列名与系统原生字段 100% 一致，附带详尽中文业务注释）
+-- 最终输出列与 VB 脚本 100% 对齐（23列）
 -- ====================================================================
 SET NOCOUNT ON;
+SET ANSI_WARNINGS OFF;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';          --【变量：保税仓代码】
-DECLARE @StartDate DATETIME = '2026-04-19';     --【变量：入库开始日期】
-DECLARE @EndDate DATETIME = '2026-05-31';       --【变量：入库结束日期】
+DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';
+DECLARE @StartDate DATETIME = '2026-04-19';
+DECLARE @EndDate DATETIME = '2026-06-01';
 
 -- --------------------------------------------------------------------
 -- STEP 1: 提取所有【集装箱重箱（Type = 1）】的正式生效入库流水
@@ -38,7 +40,7 @@ WHERE A.MA_KNQ = @MaKNQ
   AND A.NGAY_PHIEU <= @EndDate;
 
 -- --------------------------------------------------------------------
--- STEP 2: 【去重排除】扣减剔除掉在库内已经办理了“掏箱落地”的重箱流水
+-- STEP 2: 【去重排除】扣减剔除掉在库内已经办理了"掏箱落地"的重箱流水
 -- --------------------------------------------------------------------
 IF OBJECT_ID('tempdb..#DRUTHANG') IS NOT NULL DROP TABLE #DRUTHANG;
 
@@ -79,7 +81,7 @@ WHERE A.MA_KNQ = @MaKNQ
   AND A.NGAY_PHIEU <= @EndDate;
 
 -- --------------------------------------------------------------------
--- STEP 4: 联动计算“仓内所有权虚拟过户（Chuyển quyền）”的数量分摊冲抵
+-- STEP 4: 联动计算"仓内所有权虚拟过户（Chuyển quyền）"的数量分摊冲抵
 -- --------------------------------------------------------------------
 IF OBJECT_ID('tempdb..#DVANBAN') IS NOT NULL DROP TABLE #DVANBAN;
 
@@ -94,7 +96,6 @@ WHERE B.MA_KNQ = @MaKNQ AND B.TRANG_THAI = '2' AND A.DVANBANID = B.DVANBANID
   AND (EXISTS(SELECT 1 FROM #NHAP C WHERE B.DHOPDONGID_GUI = C.DHOPDONGID GROUP BY C.DHOPDONGID) 
        OR EXISTS(SELECT 1 FROM #NHAP C WHERE B.DHOPDONGID_NHAN = C.DHOPDONGID GROUP BY C.DHOPDONGID));
 
--- 更新转入货物的账面高可读备注
 UPDATE #NHAP 
 SET GHI_CHU = TEN_NGUON + N' từ HD số: ' + SO_HD_GUI 
 FROM #NHAP A, #DVANBAN B 
@@ -113,7 +114,6 @@ INTO #DVANBAN2 FROM #DVANBAN A GROUP BY CKEYS;
 
 DROP TABLE #NHAP, #DVANBAN;
 
--- 循环消减过户部分的额度
 DECLARE @i INT = 1, @j INT = ISNULL((SELECT MAX(STT) FROM #NHAP2), 1);
 WHILE (@i <= @j)
 BEGIN
@@ -123,7 +123,6 @@ BEGIN
     SET @i += 1;
 END;
 
--- 计算净输入留存资产，并对已经全单过户转走的死笔执行斩杀（DELETE）
 UPDATE #NHAP2 SET SO_LUONG = SO_LUONG2 - SO_LUONG_SD, TRI_GIA = TRI_GIA2 - SO_LUONG_SD * GIA_NHAP;
 UPDATE #NHAP2 SET GHI_CHU = N'Xuất chuyển quyền sang hợp đồng khác : ' + CAST(SO_LUONG_SD AS VARCHAR) WHERE SO_LUONG_SD > 0;
 DELETE #NHAP2 WHERE SO_LUONG = 0;
@@ -131,36 +130,34 @@ DELETE #NHAP2 WHERE SO_LUONG = 0;
 DROP TABLE #DVANBAN2;
 
 -- --------------------------------------------------------------------
--- STEP 5: 展现最纯正的入库明细流水账册 (对齐原始表头列名并附带中文注释)
+-- STEP 5: 最终输出 — 严格对齐 VB 脚本的 23 列表头与排序
 -- --------------------------------------------------------------------
 SELECT 
-    SO_PHIEU,             -- [基础] 初始入库单号 (Số phiếu)
-    NGAY_PHIEU,           -- [基础] 初始入仓日期 (Ngày phiếu)
-    SO_HD,                -- [合规] 保税合同号 (Số hợp đồng)
-    NGAY_HD,              -- [合规] 保税合同录入日期 (Ngày hợp đồng)
-    MA_NGUON,             -- [来源] 货物来源属性代码 (Mã nguồn)
-    SO_TK,                -- [报关] 海关进口报关单号 (Số tờ khai)
-    NGAY_DK,              -- [报关] 报关单申报注册日期 (Ngày đăng ký)
-    DINH_DANH_HANG_HOA,   -- [溯源] 货物海关唯一定标码 (Định danh hàng hóa)
-    MA_SP,                -- [商品] 内部商品编码 (Mã sản phẩm)
-    TEN_SP,               -- [商品] 商品综合品名 (Tên sản phẩm)
-    MA_NUOC,              -- [商品] 原产国代码 (Mã nước)
-    SO_LUONG,             -- [物控] 实际入库净数量 (Số lượng)
-    MA_DVT,               -- [物控] 计量单位编码 (Mã ĐVT)
-    TRONG_LUONG_GW,       -- [物控] 毛重-Gross Weight (Trọng lượng GW)
-    TRONG_LUONG_NW,       -- [物控] 净重-Net Weight (Trọng lượng NW)
-    GIA_NHAP,             -- [财务] 原始进口单价 (Đơn giá nhập)
-    TRI_GIA,              -- [财务] 进口总货值 (Trị giá)
-    MA_HS,                -- [报关] 海关HS税号 (Mã HS)
-    VI_TRI_HANG,          -- [仓配] 仓库物理货位格 (Vị trí hàng)
-    SO_CONT,              -- [仓配] 集装箱柜号 (Số Container)
-    SO_SEAL,              -- [仓配] 海关铅封号 (Số Seal)
-    TEN_NGUON,            -- [字典] 货物来源类型说明 (Tên nguồn)
-    TEN_DVT,              -- [字典] 计量单位名称说明 (Tên ĐVT)
-    TEN_KH,               -- [客户] 货主客户名称 (Tên khách hàng)
-    GHI_CHU               -- [其他] 虚拟过户及补充备注 (Ghi chú)
+    ROW_NUMBER() OVER(ORDER BY NGAY_PHIEU DESC, SO_PHIEU DESC, STTHANG ASC) AS [STT],
+    SO_TK                AS [Số TK nhập],
+    NGAY_DK              AS [Ngày TK],
+    SO_HD                AS [Số hợp đồng],
+    NGAY_HD              AS [Ngày hợp đồng],
+    SO_CHUNG_TU          AS [Chứng từ nội bộ],
+    TEN_NGUOI_GIAO_HANG  AS [Người giao hàng],
+    TONG_SO_KIEN         AS [Tổng số kiện],
+    SO_PHIEU             AS [Số phiếu],
+    NGAY_PHIEU           AS [Ngày nhập kho],
+    MA_SP                AS [Mã hàng],
+    TEN_SP               AS [Tên hàng],
+    MA_NUOC              AS [Xuất xứ],
+    SO_LUONG             AS [Lượng],
+    TEN_DVT              AS [Đơn vị tính],
+    TRONG_LUONG_GW       AS [Trọng lượng GW],
+    TRONG_LUONG_NW       AS [Trọng lượng NW],
+    TRI_GIA              AS [Trị Giá],
+    SO_QUAN_LY           AS [Số quản lý NB],
+    SO_CONT              AS [Số container],
+    SO_SEAL              AS [Số chì HQ],
+    GHI_CHU              AS [Ghi chú],
+    GHI_CHU_HANG         AS [Ghi chú hàng]
 FROM #NHAP2 
-ORDER BY NGAY_PHIEU DESC, SO_PHIEU DESC, STTHANG ASC;
+--WHERE MA_SP = 'U2710513'
+ORDER BY [Ngày nhập kho] DESC, [Số phiếu] DESC, STTHANG ASC;
 
--- 清理临时表缓存
 DROP TABLE #NHAP2;
