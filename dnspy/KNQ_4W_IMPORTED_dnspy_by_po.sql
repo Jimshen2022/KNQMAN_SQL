@@ -8,7 +8,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';
 DECLARE @StartDate DATETIME = '2026-04-19';
-DECLARE @EndDate DATETIME = '2026-05-31';
+DECLARE @EndDate DATETIME = '2026-06-30';
 
 -- --------------------------------------------------------------------
 -- STEP 1: 提取所有【集装箱重箱（Type = 1）】的正式生效入库流水
@@ -157,7 +157,7 @@ SELECT
     GHI_CHU              AS [Ghi chú],
     GHI_CHU_HANG         AS [Ghi chú hàng]
 FROM #NHAP2 
-WHERE SO_CHUNG_TU = 'P2VNM16'
+WHERE SO_CHUNG_TU = 'P2W0L81'
 ORDER BY [Ngày nhập kho] DESC, [Số phiếu] DESC, STTHANG ASC;
 
 DROP TABLE #NHAP2;
