@@ -10,7 +10,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 -- ========================================
 DECLARE @MaKNQ NVARCHAR(50) = 'VNNSL';          --【变量：保税仓代码】
 DECLARE @StartDate DATETIME = '2026-05-26';     --【变量：出库开始日期】
-DECLARE @EndDate DATETIME = '2026-05-26';       --【变量：出库结束日期】
+DECLARE @EndDate DATETIME = '2026-06-14';       --【变量：出库结束日期】
 
 -- --------------------------------------------------------------------
 -- STEP 1: 提取所有【集装箱重箱（Type = 1）】的正式有效出库明细
@@ -137,6 +137,9 @@ SELECT
     GHI_CHU AS [Ghi chú],                   -- [系统] 系统级动作备注 (如:销毁等)
     GHI_CHU_HANG AS [Ghi chú hàng]          -- [业务] 货物明细级备注
 FROM #XUAT 
+WHERE 1 = 1
+    --AND SO_PHIEU = '46725' 
+    AND MA_SP = 'U1210115'
 ORDER BY [Ngày phiếu] DESC, [Số phiếu] DESC;
 
 -- 清理临时表缓存
